@@ -3,7 +3,5 @@
 # Each line is a pattern followed by one or more GitHub usernames/teams.
 # The last matching rule takes precedence.
 
-# All files require a review from the repo owner
-* @NaxonRO
-* @RomanianExe
-* @CovaliuStefan
+# All files can be reviewed by any of these code owners
+* @NaxonRO @RomanianExe @CovaliuStefan
