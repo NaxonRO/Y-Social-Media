@@ -1,0 +1,72 @@
+name: Setup Branch Protection
+
+on:
+  # Run automatically whenever this workflow file changes on main
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/setup-branch-protection.yml'
+  # Allow manual triggering from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  protect-main:
+    name: Enforce branch protection on main
+    runs-on: ubuntu-latest
+    # Explicitly restrict the default GITHUB_TOKEN to no permissions.
+    # All API calls use ADMIN_TOKEN (a PAT with 'repo' scope) instead.
+    permissions: {}
+    # Modifying branch protection rules requires a Personal Access Token (PAT)
+    # with the 'repo' scope stored as the repository secret ADMIN_TOKEN.
+    # Steps to create it:
+    #   1. Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+    #   2. Generate a new token with 'repo' scope (full control of private repositories).
+    #   3. Copy the token value.
+    #   4. In this repository: Settings → Secrets and variables → Actions → New repository secret
+    #      Name: ADMIN_TOKEN   Value: <paste token>
+    #   5. Re-run this workflow.
+
+    steps:
+      - name: Apply branch protection rules to main
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/branches/main/protection" \
+            --input - <<'EOF'
+          {
+            "required_status_checks": null,
+            "enforce_admins": false,
+            "required_pull_request_reviews": {
+              "dismiss_stale_reviews": true,
+              "require_code_owner_reviews": true,
+              "required_approving_review_count": 1
+            },
+            "restrictions": null,
+            "allow_force_pushes": false,
+            "allow_deletions": false,
+            "block_creations": false,
+            "required_conversation_resolution": true
+          }
+          EOF
+
+      - name: Confirm protection applied
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Branch protection rules applied successfully."
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/branches/main/protection" \
+            --jq '{
+              required_pr_reviews: .required_pull_request_reviews.required_approving_review_count,
+              require_code_owner_reviews: .required_pull_request_reviews.require_code_owner_reviews,
+              dismiss_stale_reviews: .required_pull_request_reviews.dismiss_stale_reviews,
+              allow_force_pushes: .allow_force_pushes.enabled,
+              allow_deletions: .allow_deletions.enabled
+            }'
