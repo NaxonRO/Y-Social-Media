@@ -1,0 +1,7 @@
+# CODEOWNERS
+# Defines who must review changes before they can be merged into main.
+# Each line is a pattern followed by one or more GitHub usernames/teams.
+# The last matching rule takes precedence.
+
+# All files require a review from the repo owner
+* @NaxonRO
