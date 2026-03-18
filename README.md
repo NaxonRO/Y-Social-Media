@@ -551,17 +551,17 @@ User             App          Server       Feed Service
 
 Aplicația Y dispune de o interfață modernă, cu fundal alb/gri deschis și accente în albastru-violet (gradient `#4FC3F7` → `#7C4DFF`). Navigarea se realizează prin bara de jos cu 5 tab-uri: **Acasă, Căutare, Notificări, Mesaje, Profil**.
 
-### Anexa B — Tehnologii recomandate
+### Anexa B — Tehnologii folisite
 
-| Componentă | Tehnologie recomandată |
-|---|---|
-| Mobile App | React Native / Flutter |
-| Back-end API | Node.js (Express) sau Python (FastAPI) |
-| Bază de date | PostgreSQL + Redis |
-| Stocare media | AWS S3 + CloudFront |
-| Autentificare | JWT + OAuth 2.0 |
-| Real-time | WebSockets (Socket.io) |
-| Push notifications | Firebase Cloud Messaging |
-| CI/CD | GitHub Actions |
+| Componentă         | Tehnologie folosita                     |
+|                    |                                         |
+| Mobile App         | React Native / Flutter                  |
+| Back-end API       | Node.js (Express) sau Python (FastAPI)  |
+| Bază de date       | PostgreSQL + Redis                      |
+| Stocare media      | AWS S3 + CloudFront                     |
+| Autentificare      | JWT + OAuth 2.0                         |
+| Real-time          | WebSockets (Socket.io)                  |
+| Push notifications | Firebase Cloud Messaging                |
+| CI/CD              | GitHub Actions                          |
 
 ---
