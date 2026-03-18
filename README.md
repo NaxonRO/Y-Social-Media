@@ -552,7 +552,7 @@ User             App          Server       Feed Service
 Aplicația Y dispune de o interfață modernă, cu fundal alb/gri deschis și accente în albastru-violet (gradient `#4FC3F7` → `#7C4DFF`). Navigarea se realizează prin bara de jos cu 5 tab-uri: **Acasă, Căutare, Notificări, Mesaje, Profil**.
 
 ### Anexa B — Tehnologii folisite
-
+```
 | Componentă         | Tehnologie folosita                     |
 |                    |                                         |
 | Mobile App         | React Native / Flutter                  |
@@ -563,5 +563,5 @@ Aplicația Y dispune de o interfață modernă, cu fundal alb/gri deschis și ac
 | Real-time          | WebSockets (Socket.io)                  |
 | Push notifications | Firebase Cloud Messaging                |
 | CI/CD              | GitHub Actions                          |
-
+```
 ---
