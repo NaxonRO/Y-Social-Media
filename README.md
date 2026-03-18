@@ -346,19 +346,19 @@ Piața aplicațiilor de socializare este dominată de platforme internaționale 
 
 **Diagrama de secvență:**
 ```
-Guest       App         Server       Email Service
-  |          |              |              |
-  |--tap-->  |              |              |
-  |  <--form--|              |              |
-  |--date-->  |              |              |
-  |          |--POST /reg-->|              |
-  |          |              |--send email->|
-  |          |  <--201 OK---|              |
-  |  <--success--|           |              |
-  |--confirm-->  |           |              |
-  |          |--verify----> |              |
-  |          |  <--OK-------|              |
-  |  <--feed--|              |              |
+Guest          App         Server       Email Service
+  |             |              |              |
+  |----tap----> |              |              |
+  |<----form----|              |              |
+  |----date---->|              |              |
+  |             |--POST /reg-->|              |
+  |             |              |--send email->|
+  |             |<----201 OK---|              |
+  |<---success--|              |              |
+  |--confirm--->|              |              |
+  |             |---verify---->|              |
+  |             |<----OK-------|              |
+  |<----feed----|              |              |
 ```
 
 **Alternative:**
@@ -391,16 +391,16 @@ Guest       App         Server       Email Service
 
 **Diagrama de secvență:**
 ```
-User        App         Server       Feed Service
-  |          |              |              |
-  |--tap +-->|              |              |
-  |  <--editor--|           |              |
-  |--text+media->|          |              |
-  |--tap post->  |          |              |
-  |          |--POST /post->|              |
-  |          |              |--update feed->|
-  |          |  <--201 OK---|              |
-  |  <--confirmare--|        |              |
+User             App          Server       Feed Service
+  |               |              |               |
+  |----tap +----->|              |               |
+  |<----editor----|              |               |
+  |--text+media-->|              |               |
+  |---tap post--->|              |               |
+  |               |--POST /post->|               |
+  |               |              |--update feed->|
+  |               |<---201 OK----|               |
+  |<--confirmare--|              |               |
 ```
 
 **Alternative:**
@@ -517,19 +517,19 @@ User        App         Server       Feed Service
 #### 3.5.3 Diagrama de context
 
 ```
-                        ┌───────────────────┐
-                        │                   │
-    Utilizator ─────────►                   ├────────── Email Service
+                         ┌───────────────────┐
+                         │                   │
+    Utilizator ─────────►|                   ├────────── Email Service
     (autentificat)       │                   │           (confirmare cont,
-                        │    SISTEMUL Y     │            recuperare parolă)
-    Vizitator ──────────►    (Aplicație     │
-    (neautentificat)    │     mobilă +      ├────────── Push Notification
-                        │     back-end)     │           Service (FCM/APNs)
-    Administrator ──────►                   │
-                        │                   ├────────── CDN / Media Storage
-    Moderator ──────────►                   │           (imagini, GIF-uri)
-                        │                   │
-                        └───────────────────┘
+                         │    SISTEMUL Y     │            recuperare parolă)
+    Vizitator ──────────►|    (Aplicație     │
+    (neautentificat)     │     mobilă +      ├────────── Push Notification
+                         │     back-end)     │           Service (FCM/APNs)
+    Administrator ──────►|                   │
+                         │                   ├────────── CDN / Media Storage
+    Moderator ──────────►|                   │           (imagini, GIF-uri)
+                         │                   │
+                         └───────────────────┘
                                  │
                                  │
                           Cloud Database
