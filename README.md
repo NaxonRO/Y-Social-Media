@@ -77,10 +77,10 @@ Interfața aplicației este în limba română, cu un design modern, curat, baza
 
 ### 2.2 Motivație
 
-Piața aplicațiilor de socializare este dominată de platforme internaționale (X/Twitter, Instagram, Facebook) care nu sunt adaptate culturii și limbii române. Utilizatorii români nu au o platformă nativă, în limba lor, gândită pentru comunitatea locală.
+Piața aplicațiilor de socializare este dominată de platforme internaționale (X/Twitter, Instagram, Facebook) care nu sunt adaptate limbii române. Utilizatorii români nu au o platformă nativă, în limba lor, gândită pentru comunitatea locală.
 
 **Y** adresează această nevoie prin:
-- **Interfață nativă în română** — terminologie și UX adaptat utilizatorului român
+- **Interfață nativă în română** — terminologie și UX
 - **Focus pe comunitate locală** — hashtag-uri locale (#București, #România), grupuri de evenimente locale
 - **Design modern și performant** — experiență fluentă pe dispozitive mid-range populare în România
 - **Confidențialitate sporită** — date stocate conform GDPR, cu transparență față de utilizatori
@@ -92,16 +92,16 @@ Piața aplicațiilor de socializare este dominată de platforme internaționale 
 | **X (Twitter)** | Micro-blogging, hashtag-uri, follow, repost | Interfață în engleză, focusat global, algoritm opac |
 | **Instagram** | Feed vizual, profil, stories, DM | Focusat pe imagini/video, nu text-first |
 | **Facebook** | Grupuri, mesagerie, notificări | Interfață complexă, nu micro-blogging |
-| **Mastodon** | Platformă descentralizată, micro-blogging | Fără focalizare pe România, UI tehnic |
-| **Threads** | Micro-blogging integrat cu Meta | Fără hashtag-uri avansate, nu localizat în română |
+| **Mastodon** | Platformă descentralizată, micro-blogging | UI tehnic |
+| **Threads** | Micro-blogging integrat cu Meta | Fără hashtag-uri avansate |
 
-**Avantajul competitiv al Y:** Prima platformă de micro-blogging construită exclusiv pentru utilizatorul român, cu UX optimizat și comunitate locală ca nucleu.
+**Avantajul competitiv al Y:** Prima platformă de micro-blogging construită pentru utilizatorul român, cu UX optimizat și comunitate locală ca nucleu.
 
 ### 2.4 Riscurile proiectului
 
 #### 2.4.1 Riscuri de competiție
 - **Risc ridicat:** Platformele mari (Meta, X Corp) pot lansa funcționalități similare sau campanii de retenție agresive.
-- **Mitigare:** Focalizare pe nișa locală și funcționalități specifice comunității românești.
+- **Mitigare:** Focalizare pe nișa locală și funcționalități avansate.
 
 #### 2.4.2 Riscuri de experiență
 - **Risc mediu:** Echipa poate avea experiență limitată în dezvoltarea de aplicații mobile la scară largă.
