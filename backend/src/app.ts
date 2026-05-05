@@ -10,7 +10,11 @@ dotenv.config();
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
+const corsOrigins = (process.env.CORS_ORIGIN || '*').split(',').map((o) => o.trim());
+app.use(cors({
+  origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

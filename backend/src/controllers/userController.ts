@@ -20,6 +20,29 @@ export const userController = {
     }
   },
 
+  async updateProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { display_name, bio } = req.body as { display_name?: string; bio?: string };
+      if (display_name !== undefined && display_name.length > 100) {
+        res.status(400).json({ success: false, message: 'Numele afișat poate avea maxim 100 caractere' });
+        return;
+      }
+      if (bio !== undefined && bio.length > 160) {
+        res.status(400).json({ success: false, message: 'Bio poate avea maxim 160 caractere' });
+        return;
+      }
+      const updated = await UserModel.updateProfile(req.user!.id, { display_name, bio });
+      if (!updated) {
+        res.status(404).json({ success: false, message: 'Utilizator negăsit' });
+        return;
+      }
+      res.status(200).json({ success: true, data: { user: UserModel.toPublicProfile(updated) } });
+    } catch (error) {
+      console.error('UpdateProfile error:', error);
+      res.status(500).json({ success: false, message: 'Eroare internă de server' });
+    }
+  },
+
   async getUserById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
