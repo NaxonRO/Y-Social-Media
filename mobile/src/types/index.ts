@@ -72,7 +72,7 @@ export type AuthStackParamList = {
 
 export type MainStackParamList = {
   MainTabs: undefined;
-  PostDetail: { postId: string };
+  PostDetail: { postId: string; post?: Post };
   EditProfile: undefined;
 };
 

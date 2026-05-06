@@ -9,11 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../components/PostCard';
 import { useAuth } from '../context/AuthContext';
+import { postService } from '../services/postService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -23,17 +26,30 @@ export default function ComposeScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
   const [content, setContent] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const remaining = MAX_CHARS - content.length;
-  const canPost = content.trim().length > 0 && remaining >= 0;
+  const canPost = content.trim().length > 0 && remaining >= 0 && !isPosting;
 
   const counterColor =
     remaining < 0 ? colors.error : remaining < 20 ? '#FFAD1F' : colors.text.disabled;
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!canPost) return;
-    setContent('');
-    navigation.goBack();
+    setIsPosting(true);
+    try {
+      await postService.createPost(content.trim());
+      setContent('');
+      navigation.goBack();
+    } catch {
+      if (Platform.OS === 'web') {
+        window.alert('Nu s-a putut posta. Încearcă din nou.');
+      } else {
+        Alert.alert('Eroare', 'Nu s-a putut posta. Încearcă din nou.');
+      }
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   return (
@@ -51,9 +67,10 @@ export default function ComposeScreen() {
             onPress={handlePost}
             disabled={!canPost}
           >
-            <Text style={[styles.postBtnText, !canPost && styles.postBtnTextDisabled]}>
-              Postează
-            </Text>
+            {isPosting
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={[styles.postBtnText, !canPost && styles.postBtnTextDisabled]}>Postează</Text>
+            }
           </TouchableOpacity>
         </View>
 

@@ -10,6 +10,8 @@ import { typography } from '../theme/typography';
 interface Props {
   post: Post;
   onPress: () => void;
+  currentUserId?: string;
+  onDelete?: () => void;
 }
 
 function Avatar({ username, size = 44 }: { username: string; size?: number }) {
@@ -24,7 +26,8 @@ function Avatar({ username, size = 44 }: { username: string; size?: number }) {
 
 export { Avatar };
 
-export default function PostCard({ post, onPress }: Props) {
+export default function PostCard({ post, onPress, currentUserId, onDelete }: Props) {
+  const isOwn = !!currentUserId && post.user_id === currentUserId;
   const { interactions, toggleLike, toggleRepost } = usePosts();
   const state = interactions[post.id] ?? {
     liked: post.liked_by_me,
@@ -70,6 +73,11 @@ export default function PostCard({ post, onPress }: Props) {
             <Text style={styles.dot}>·</Text>
             <Text style={styles.time}>{formatRelativeTime(post.created_at)}</Text>
           </View>
+          {isOwn && onDelete && (
+            <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.content}>{renderContent(post.content)}</Text>
@@ -150,6 +158,9 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   authorRow: {

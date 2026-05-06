@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { mockPosts, mockComments } from '../data/mockData';
 import { appStorage } from '../services/appStorage';
 import { useAuth } from './AuthContext';
-import { Comment } from '../types';
+import { Comment, Post } from '../types';
+import { postService } from '../services/postService';
 
 interface PostInteraction {
   liked: boolean;
@@ -15,6 +16,7 @@ interface PostInteraction {
 interface PostsContextValue {
   interactions: Record<string, PostInteraction>;
   comments: Record<string, Comment[]>;
+  knownPosts: Record<string, Post>;
   likedPostIds: string[];
   repostedPostIds: string[];
   commentedPostIds: string[];
@@ -23,6 +25,8 @@ interface PostsContextValue {
   toggleRepost: (postId: string) => void;
   addComment: (postId: string, comment: Comment) => void;
   removeComment: (postId: string, commentId: string, userId: string) => void;
+  registerPosts: (posts: Post[]) => void;
+  markAsCommented: (postId: string) => void;
 }
 
 const PostsContext = createContext<PostsContextValue | null>(null);
@@ -67,6 +71,13 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [repostedPostIds, setRepostedPostIds] = useState<string[]>([]);
   const [commentedPostIds, setCommentedPostIds] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [knownPosts, setKnownPosts] = useState<Record<string, Post>>(() => {
+    const map: Record<string, Post> = {};
+    for (const p of mockPosts) map[p.id] = p as unknown as Post;
+    return map;
+  });
+  const knownPostsRef = useRef(knownPosts);
+  useEffect(() => { knownPostsRef.current = knownPosts; }, [knownPosts]);
 
   // comentarii finale = cele ale userului (noi primele) + mock-urile
   const mockCommentMap = buildMockComments();
@@ -85,6 +96,11 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setRepostedPostIds([]);
     setCommentedPostIds([]);
     setIsLoaded(false);
+    setKnownPosts(() => {
+      const map: Record<string, Post> = {};
+      for (const p of mockPosts) map[p.id] = p as unknown as Post;
+      return map;
+    });
 
     if (!userId) {
       setIsLoaded(true);
@@ -136,46 +152,61 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 500);
   }
 
+  const getOrBuildCur = (prev: Record<string, PostInteraction>, postId: string): PostInteraction => {
+    const known = knownPostsRef.current[postId];
+    return prev[postId] ?? {
+      liked: false,
+      likeCount: known?.like_count ?? 0,
+      reposted: false,
+      repostCount: known?.repost_count ?? 0,
+      commentCount: known?.comment_count ?? 0,
+    };
+  };
+
   const toggleLike = useCallback((postId: string) => {
+    // optimistic update
     setInteractions((prev) => {
-      const cur = prev[postId];
-      if (!cur) return prev;
-      const next = {
-        ...prev,
-        [postId]: {
-          ...cur,
-          liked: !cur.liked,
-          likeCount: cur.liked ? cur.likeCount - 1 : cur.likeCount + 1,
-        },
-      };
-      scheduleSave(next, userComments, repostedPostIds, commentedPostIds);
-      return next;
+      const cur = getOrBuildCur(prev, postId);
+      return { ...prev, [postId]: { ...cur, liked: !cur.liked, likeCount: cur.liked ? cur.likeCount - 1 : cur.likeCount + 1 } };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userComments, repostedPostIds, commentedPostIds]);
+    postService.toggleLike(postId).then(({ liked, likeCount }) => {
+      setInteractions((prev) => {
+        const cur = getOrBuildCur(prev, postId);
+        return { ...prev, [postId]: { ...cur, liked, likeCount } };
+      });
+    }).catch(() => {
+      // revert
+      setInteractions((prev) => {
+        const cur = getOrBuildCur(prev, postId);
+        return { ...prev, [postId]: { ...cur, liked: !cur.liked, likeCount: cur.liked ? cur.likeCount - 1 : cur.likeCount + 1 } };
+      });
+    });
+  }, []);
 
   const toggleRepost = useCallback((postId: string) => {
+    // optimistic update
     setInteractions((prev) => {
-      const cur = prev[postId];
-      if (!cur) return prev;
+      const cur = getOrBuildCur(prev, postId);
       const nowReposted = !cur.reposted;
-      const newReposted = nowReposted
-        ? [...repostedPostIds.filter((id) => id !== postId), postId]
-        : repostedPostIds.filter((id) => id !== postId);
-      setRepostedPostIds(newReposted);
-      const next = {
-        ...prev,
-        [postId]: {
-          ...cur,
-          reposted: nowReposted,
-          repostCount: cur.reposted ? cur.repostCount - 1 : cur.repostCount + 1,
-        },
-      };
-      scheduleSave(next, userComments, newReposted, commentedPostIds);
-      return next;
+      setRepostedPostIds((r) => nowReposted ? [...r.filter((id) => id !== postId), postId] : r.filter((id) => id !== postId));
+      return { ...prev, [postId]: { ...cur, reposted: nowReposted, repostCount: cur.reposted ? cur.repostCount - 1 : cur.repostCount + 1 } };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userComments, repostedPostIds, commentedPostIds]);
+    postService.toggleRepost(postId).then(({ reposted, repostCount }) => {
+      setInteractions((prev) => {
+        const cur = getOrBuildCur(prev, postId);
+        return { ...prev, [postId]: { ...cur, reposted, repostCount } };
+      });
+      setRepostedPostIds((r) => reposted ? [...r.filter((id) => id !== postId), postId] : r.filter((id) => id !== postId));
+    }).catch(() => {
+      // revert
+      setInteractions((prev) => {
+        const cur = getOrBuildCur(prev, postId);
+        const reverted = !cur.reposted;
+        setRepostedPostIds((r) => reverted ? [...r.filter((id) => id !== postId), postId] : r.filter((id) => id !== postId));
+        return { ...prev, [postId]: { ...cur, reposted: reverted, repostCount: cur.reposted ? cur.repostCount - 1 : cur.repostCount + 1 } };
+      });
+    });
+  }, []);
 
   const addComment = useCallback((postId: string, comment: Comment) => {
     setUserComments((prevUC) => {
@@ -217,6 +248,57 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repostedPostIds, commentedPostIds]);
 
+  const markAsCommented = useCallback((postId: string) => {
+    setCommentedPostIds((prev) => {
+      if (prev.includes(postId)) return prev;
+      const next = [...prev, postId];
+      if (userIdRef.current) {
+        const keys = storageKeys(userIdRef.current);
+        appStorage.setJson(keys.commented, next);
+      }
+      return next;
+    });
+    setInteractions((prev) => {
+      const cur = prev[postId];
+      const known = knownPostsRef.current[postId];
+      if (cur) {
+        return { ...prev, [postId]: { ...cur, commentCount: cur.commentCount + 1 } };
+      }
+      return {
+        ...prev,
+        [postId]: {
+          liked: false,
+          likeCount: known?.like_count ?? 0,
+          reposted: false,
+          repostCount: known?.repost_count ?? 0,
+          commentCount: (known?.comment_count ?? 0) + 1,
+        },
+      };
+    });
+  }, []);
+
+  const registerPosts = useCallback((posts: Post[]) => {
+    setKnownPosts((prev) => {
+      const next = { ...prev };
+      for (const p of posts) next[p.id] = p;
+      return next;
+    });
+    setInteractions((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const p of posts) {
+        if (next[p.id]) {
+          const cur = next[p.id];
+          if (cur.commentCount !== p.comment_count || cur.likeCount !== p.like_count || cur.repostCount !== p.repost_count) {
+            next[p.id] = { ...cur, commentCount: p.comment_count, likeCount: p.like_count, repostCount: p.repost_count };
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
   const likedPostIds = Object.entries(interactions)
     .filter(([, s]) => s.liked)
     .map(([id]) => id);
@@ -225,6 +307,7 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <PostsContext.Provider value={{
       interactions,
       comments,
+      knownPosts,
       likedPostIds,
       repostedPostIds,
       commentedPostIds,
@@ -233,6 +316,8 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toggleRepost,
       addComment,
       removeComment,
+      registerPosts,
+      markAsCommented,
     }}>
       {children}
     </PostsContext.Provider>

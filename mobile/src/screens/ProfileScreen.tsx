@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,17 @@ import {
   ScrollView,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/PostCard';
-import { mockPosts, formatCount } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { usePosts } from '../context/PostsContext';
+import { postService } from '../services/postService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { MainStackParamList, Post } from '../types';
@@ -29,17 +31,41 @@ const TABS: ProfileTab[] = ['Postări', 'Răspunsuri', 'Media', 'Like-uri'];
 export default function ProfileScreen() {
   const navigation = useNavigation<Nav>();
   const { user, logout } = useAuth();
-  const { likedPostIds, repostedPostIds, commentedPostIds } = usePosts();
+  const { likedPostIds, commentedPostIds, repostedPostIds, knownPosts, registerPosts } = usePosts();
   const [activeTab, setActiveTab] = useState<ProfileTab>('Postări');
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [loadingMyPosts, setLoadingMyPosts] = useState(false);
 
-  const repostedPosts = mockPosts.filter((p) => repostedPostIds.includes(p.id));
-  const likedPosts    = mockPosts.filter((p) => likedPostIds.includes(p.id));
-  const repliedPosts  = mockPosts.filter((p) => commentedPostIds.includes(p.id));
+  const loadMyPosts = useCallback(async () => {
+    setLoadingMyPosts(true);
+    try {
+      const { posts } = await postService.getMyPosts();
+      setMyPosts(posts);
+      registerPosts(posts);
+    } catch {
+      // backend inaccesibil
+    } finally {
+      setLoadingMyPosts(false);
+    }
+  }, [registerPosts]);
+
+  useFocusEffect(useCallback(() => {
+    loadMyPosts();
+  }, [loadMyPosts]));
+
+  const repostedPosts = repostedPostIds.map((id) => knownPosts[id]).filter(Boolean) as Post[];
+  const likedPosts    = likedPostIds.map((id) => knownPosts[id]).filter(Boolean) as Post[];
+  const repliedPosts  = commentedPostIds.map((id) => knownPosts[id]).filter(Boolean) as Post[];
+
+  const myPostsWithReposts = [
+    ...myPosts,
+    ...repostedPosts.filter((rp) => !myPosts.some((mp) => mp.id === rp.id)),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const displayedPosts =
-    activeTab === 'Postări'    ? repostedPosts :
-    activeTab === 'Răspunsuri' ? repliedPosts  :
-    activeTab === 'Like-uri'   ? likedPosts    : [];
+    activeTab === 'Postări'    ? myPostsWithReposts :
+    activeTab === 'Răspunsuri' ? repliedPosts        :
+    activeTab === 'Like-uri'   ? likedPosts          : [];
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -52,7 +78,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const handlePostPress = (post: Post) => navigation.navigate('PostDetail', { postId: post.id });
+  const handlePostPress = (post: Post) => navigation.navigate('PostDetail', { postId: post.id, post });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -73,12 +99,16 @@ export default function ProfileScreen() {
           />
         }
         ListEmptyComponent={
-          activeTab !== 'Postări' ? (
+          activeTab === 'Postări' && loadingMyPosts ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="small" color={colors.text.secondary} />
+            </View>
+          ) : (
             <View style={styles.emptyState}>
               <Ionicons name="document-outline" size={40} color={colors.text.disabled} />
               <Text style={styles.emptyText}>Nicio postare aici</Text>
             </View>
-          ) : null
+          )
         }
       />
     </SafeAreaView>

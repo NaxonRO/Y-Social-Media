@@ -26,7 +26,10 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/v1', routes);
+app.use('/api/v1', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+}, routes);
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: 'Rută negăsită' });
