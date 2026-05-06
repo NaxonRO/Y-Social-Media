@@ -378,13 +378,13 @@ Editează [mobile/app.json](mobile/app.json) și setează IP-ul mașinii tale (n
 
 ```json
 "extra": {
-  "apiUrl": "http://192.168.1.X:3000/api/v1"
+  "apiUrl": "http://192.168.X.X:3000/api/v1"
 }
 ```
 
 Sau setează variabila de mediu:
 ```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.X:3000/api/v1 npx expo start
+EXPO_PUBLIC_API_URL=http://192.168.X.X:3000/api/v1 npx expo start
 ```
 
 ### Fluxuri de testat în aplicație

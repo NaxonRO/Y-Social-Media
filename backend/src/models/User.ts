@@ -63,6 +63,25 @@ export const UserModel = {
     );
   },
 
+  async updateProfile(
+    userId: string,
+    data: { display_name?: string; bio?: string }
+  ): Promise<User | null> {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (data.display_name !== undefined) { fields.push(`display_name = $${idx++}`); values.push(data.display_name || null); }
+    if (data.bio !== undefined) { fields.push(`bio = $${idx++}`); values.push(data.bio || null); }
+    if (fields.length === 0) return this.findById(userId);
+    fields.push(`updated_at = NOW()`);
+    values.push(userId);
+    const result = await query(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    return result.rows[0] || null;
+  },
+
   async verifyEmail(token: string): Promise<User | null> {
     const result = await query(
       `UPDATE users

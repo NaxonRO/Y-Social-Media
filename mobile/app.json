@@ -9,7 +9,7 @@
       "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "ro.ysocial.app"
     },
     "android": {
@@ -17,6 +17,11 @@
         "backgroundColor": "#000000"
       },
       "package": "ro.ysocial.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "apiUrl": "http://localhost:3000/api/v1"
