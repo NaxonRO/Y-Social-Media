@@ -7,9 +7,9 @@ export const postService = {
     return res.data.data.post;
   },
 
-  async getFeed(cursor?: string): Promise<{ posts: Post[]; nextCursor: string | null }> {
+  async getFeed(cursor?: string, followingOnly = false): Promise<{ posts: Post[]; nextCursor: string | null }> {
     const res = await api.get('/posts/feed', {
-      params: { limit: 20, ...(cursor ? { cursor } : {}) },
+      params: { limit: 20, ...(cursor ? { cursor } : {}), ...(followingOnly ? { following: 'true' } : {}) },
     });
     return { posts: res.data.data.posts, nextCursor: res.data.data.nextCursor };
   },
@@ -47,5 +47,21 @@ export const postService = {
 
   async deleteComment(postId: string, commentId: string): Promise<void> {
     await api.delete(`/posts/${postId}/comments/${commentId}`);
+  },
+
+  async getPostById(postId: string): Promise<Post> {
+    const res = await api.get(`/posts/${postId}`);
+    const p = res.data.data.post;
+    return { ...p, liked_by_me: p.liked_by_me ?? false, reposted_by_me: p.reposted_by_me ?? false };
+  },
+
+  async searchByHashtag(query: string): Promise<Post[]> {
+    const res = await api.get('/posts/search', { params: { q: query } });
+    return res.data.data.posts;
+  },
+
+  async getTrendingHashtags(): Promise<{ tag: string; count: number }[]> {
+    const res = await api.get('/posts/trending-tags');
+    return res.data.data.tags;
   },
 };

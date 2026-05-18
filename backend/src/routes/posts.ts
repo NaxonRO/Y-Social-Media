@@ -7,7 +7,10 @@ const router = Router();
 
 router.get('/feed', optionalAuthenticate, postController.getFeed);
 router.get('/mine', authenticate, postController.getMyPosts);
+router.get('/search', optionalAuthenticate, postController.searchPosts);
+router.get('/trending-tags', postController.getTrendingHashtags);
 router.post('/', authenticate, postController.createPost);
+router.get('/:id', optionalAuthenticate, postController.getPostById);
 router.delete('/:id', authenticate, postController.deletePost);
 
 router.post('/:id/like', authenticate, postController.toggleLike);

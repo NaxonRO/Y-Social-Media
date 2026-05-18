@@ -19,7 +19,9 @@ import PostCard from '../components/PostCard';
 import { Avatar } from '../components/PostCard';
 import { useAuth } from '../context/AuthContext';
 import { usePosts } from '../context/PostsContext';
+import { useFollow } from '../context/FollowContext';
 import { postService } from '../services/postService';
+import UserListModal from '../components/UserListModal';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { MainStackParamList, Post } from '../types';
@@ -32,6 +34,8 @@ export default function ProfileScreen() {
   const navigation = useNavigation<Nav>();
   const { user, logout } = useAuth();
   const { likedPostIds, commentedPostIds, repostedPostIds, knownPosts, registerPosts } = usePosts();
+  const { counts, refreshCounts } = useFollow();
+  const [modal, setModal] = useState<{ type: 'followers' | 'following'; title: string } | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('Postări');
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [loadingMyPosts, setLoadingMyPosts] = useState(false);
@@ -96,6 +100,9 @@ export default function ProfileScreen() {
             setActiveTab={setActiveTab}
             onEdit={() => navigation.navigate('EditProfile')}
             onLogout={handleLogout}
+            followCounts={counts}
+            onShowFollowers={() => setModal({ type: 'followers', title: 'Urmăritori' })}
+            onShowFollowing={() => setModal({ type: 'following', title: 'Urmărești' })}
           />
         }
         ListEmptyComponent={
@@ -111,12 +118,25 @@ export default function ProfileScreen() {
           )
         }
       />
+
+      {modal && user && (
+        <UserListModal
+          visible={!!modal}
+          type={modal.type}
+          userId={user.id}
+          title={modal.title}
+          onClose={() => { setModal(null); refreshCounts(); }}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 function ProfileHeader({
   user,
+  followCounts,
+  onShowFollowing,
+  onShowFollowers,
   activeTab,
   setActiveTab,
   onEdit,
@@ -127,6 +147,9 @@ function ProfileHeader({
   setActiveTab: (t: ProfileTab) => void;
   onEdit: () => void;
   onLogout: () => void;
+  followCounts: { followers: number; following: number };
+  onShowFollowers: () => void;
+  onShowFollowing: () => void;
 }) {
   const joinedDate = user?.created_at
     ? new Date(user.created_at).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' })
@@ -182,12 +205,12 @@ function ProfileHeader({
         </View>
 
         <View style={styles.statsRow}>
-          <TouchableOpacity style={styles.statItem}>
-            <Text style={styles.statCount}>0</Text>
+          <TouchableOpacity style={styles.statItem} onPress={onShowFollowing}>
+            <Text style={styles.statCount}>{followCounts.following}</Text>
             <Text style={styles.statLabel}> Urmărești</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.statItem, styles.statItemGap]}>
-            <Text style={styles.statCount}>0</Text>
+          <TouchableOpacity style={[styles.statItem, styles.statItemGap]} onPress={onShowFollowers}>
+            <Text style={styles.statCount}>{followCounts.followers}</Text>
             <Text style={styles.statLabel}> Urmăritori</Text>
           </TouchableOpacity>
         </View>

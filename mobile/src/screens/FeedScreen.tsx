@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -22,6 +22,7 @@ import { mockPosts } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { usePosts } from '../context/PostsContext';
 import { postService } from '../services/postService';
+import { useFollow } from '../context/FollowContext';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { MainStackParamList, Post } from '../types';
@@ -32,17 +33,27 @@ export default function FeedScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const { isLoaded, registerPosts } = usePosts();
+  const { followingIds } = useFollow();
   const flatListRef = useRef<FlatList>(null);
 
+  const [activeTab, setActiveTab] = useState<'forYou' | 'following'>('forYou');
   const [realPosts, setRealPosts] = useState<Post[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const loadFeed = useCallback(async (cursor?: string) => {
+  // Reload feed cand se schimba tab-ul
+  useEffect(() => {
+    setRealPosts([]);
+    setNextCursor(null);
+    setIsLoadingFeed(true);
+    loadFeed(undefined, activeTab === 'following');
+  }, [activeTab]);
+
+  const loadFeed = useCallback(async (cursor?: string, followingOnly = false) => {
     try {
-      const { posts, nextCursor: nc } = await postService.getFeed(cursor);
+      const { posts, nextCursor: nc } = await postService.getFeed(cursor, followingOnly);
       if (cursor) {
         setRealPosts((prev) => [...prev, ...posts]);
       } else {
@@ -101,9 +112,11 @@ export default function FeedScreen() {
   const handlePostPress = (post: Post) =>
     navigation.navigate('PostDetail', { postId: post.id, post });
 
-  // posturi reale + mock-uri (fara duplicate)
+  // tab "Urmărești": doar posturi reale; tab "Pentru tine": reale + mock fallback
   const realIds = new Set(realPosts.map((p) => p.id));
-  const allPosts = [...realPosts, ...mockPosts.filter((p) => !realIds.has(p.id))];
+  const allPosts = activeTab === 'following'
+    ? realPosts
+    : [...realPosts, ...mockPosts.filter((p) => !realIds.has(p.id))];
 
   if (!isLoaded || isLoadingFeed) {
     return (
@@ -140,7 +153,7 @@ export default function FeedScreen() {
           />
         )}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={<TabsBar />}
+        ListHeaderComponent={<TabsBar activeTab={activeTab} onTabChange={setActiveTab} />}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text.primary} />
         }
@@ -158,15 +171,15 @@ export default function FeedScreen() {
   );
 }
 
-function TabsBar() {
+function TabsBar({ activeTab, onTabChange }: { activeTab: 'forYou' | 'following'; onTabChange: (t: 'forYou' | 'following') => void }) {
   return (
     <View style={styles.feedTabs}>
-      <View style={[styles.feedTab, styles.feedTabActive]}>
-        <Text style={[styles.feedTabText, styles.feedTabTextActive]}>Pentru tine</Text>
-      </View>
-      <View style={styles.feedTab}>
-        <Text style={styles.feedTabText}>Urmărești</Text>
-      </View>
+      <TouchableOpacity style={[styles.feedTab, activeTab === 'forYou' && styles.feedTabActive]} onPress={() => onTabChange('forYou')}>
+        <Text style={[styles.feedTabText, activeTab === 'forYou' && styles.feedTabTextActive]}>Pentru tine</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.feedTab, activeTab === 'following' && styles.feedTabActive]} onPress={() => onTabChange('following')}>
+        <Text style={[styles.feedTabText, activeTab === 'following' && styles.feedTabTextActive]}>Urmărești</Text>
+      </TouchableOpacity>
     </View>
   );
 }

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import FeedScreen from '../screens/FeedScreen';
@@ -11,12 +12,42 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import ConversationScreen from '../screens/ConversationScreen';
 
 import { MainStackParamList, MainTabParamList } from '../types';
 import { colors } from '../theme/colors';
+import { notificationService } from '../services/notificationService';
+import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<MainStackParamList>();
+
+function NotificationTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  const { user } = useAuth();
+  const [badge, setBadge] = useState<number>(0);
+
+  useFocusEffect(useCallback(() => {
+    if (!user) return;
+    notificationService.getUnreadCount()
+      .then(setBadge)
+      .catch(() => {});
+  }, [user]));
+
+  return (
+    <View>
+      <Ionicons
+        name={focused ? 'notifications' : 'notifications-outline'}
+        size={26}
+        color={color}
+      />
+      {badge > 0 && (
+        <View style={styles.badge}>
+          <Ionicons name="ellipse" size={8} color="#E0245E" />
+        </View>
+      )}
+    </View>
+  );
+}
 
 function MainTabs() {
   return (
@@ -62,13 +93,7 @@ function MainTabs() {
         name="Notifications"
         component={NotificationsScreen}
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'notifications' : 'notifications-outline'}
-              size={26}
-              color={color}
-            />
-          ),
+          tabBarIcon: (props) => <NotificationTabIcon {...props} />,
         }}
       />
       <Tab.Screen
@@ -98,6 +123,11 @@ export default function MainNavigator() {
         component={EditProfileScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
+      <Stack.Screen
+        name="Conversation"
+        component={ConversationScreen}
+        options={{ animation: Platform.OS === 'ios' ? 'default' : 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -119,5 +149,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Platform.OS === 'ios' ? 8 : 0,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
   },
 });

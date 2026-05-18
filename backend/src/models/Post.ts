@@ -64,13 +64,20 @@ export const PostModel = {
     return result.rows[0] || null;
   },
 
-  async getFeed(limit = 20, cursor?: string, userId?: string): Promise<PostWithAuthor[]> {
+  async getFeed(limit = 20, cursor?: string, userId?: string, followingOnly = false): Promise<PostWithAuthor[]> {
     const params: unknown[] = [limit];
-    let where = '';
+    const conditions: string[] = [];
+
     if (cursor) {
       params.push(cursor);
-      where = `WHERE p.created_at < $2`;
+      conditions.push(`p.created_at < $${params.length}`);
     }
+    if (followingOnly && userId) {
+      params.push(userId);
+      conditions.push(`p.user_id IN (SELECT following_id FROM followers WHERE follower_id=$${params.length})`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const userParam = userId ? (params.push(userId), `$${params.length}`) : null;
     const result = await query(feedQuery(where, '$1', userParam), params);
     return result.rows;
@@ -128,6 +135,29 @@ export const PostModel = {
       [postId]
     );
     return { reposted: true, repostCount: Number(res.rows[0].repost_count) };
+  },
+
+  async searchByHashtag(tag: string, limit = 20, userId?: string): Promise<PostWithAuthor[]> {
+    const searchTag = (tag.startsWith('#') ? tag : `#${tag}`).toLowerCase();
+    const params: unknown[] = [limit, `%${searchTag}%`];
+    const userParam = userId ? (params.push(userId), `$${params.length}`) : null;
+    const result = await query(
+      feedQuery('WHERE LOWER(p.content) LIKE $2', '$1', userParam),
+      params
+    );
+    return result.rows;
+  },
+
+  async getTrendingHashtags(limit = 8): Promise<{ tag: string; count: number }[]> {
+    const result = await query(
+      `SELECT m[1] AS tag, COUNT(*) AS count
+       FROM posts, regexp_matches(content, '#([A-Za-z0-9_]+)', 'g') AS m
+       GROUP BY tag
+       ORDER BY count DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return result.rows.map((r: any) => ({ tag: r.tag as string, count: Number(r.count) }));
   },
 
   async delete(postId: string, userId: string): Promise<boolean> {

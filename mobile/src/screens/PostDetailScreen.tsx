@@ -19,6 +19,8 @@ import { mockPosts, formatRelativeTime, formatCount, getAvatarColor } from '../d
 import { useAuth } from '../context/AuthContext';
 import { usePosts } from '../context/PostsContext';
 import { postService } from '../services/postService';
+import { messageService } from '../services/messageService';
+import FollowButton from '../components/FollowButton';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { MainStackParamList, Comment } from '../types';
@@ -32,6 +34,29 @@ interface PostHeaderProps {
   onBack: () => void;
   onToggleLike: () => void;
   onToggleRepost: () => void;
+}
+
+function MessageButton({ authorId, authorUsername }: { authorId: string; authorUsername: string }) {
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  if (!user || user.id === authorId) return null;
+
+  const handlePress = async () => {
+    try {
+      const convId = await messageService.getOrCreateConversation(authorId);
+      navigation.navigate('Conversation', { conversationId: convId, otherUsername: authorUsername });
+    } catch {
+      if (Platform.OS === 'web') window.alert('Eroare la deschiderea conversației.');
+      else Alert.alert('Eroare', 'Eroare la deschiderea conversației.');
+    }
+  };
+
+  return (
+    <TouchableOpacity style={styles.msgBtn} onPress={handlePress}>
+      <Ionicons name="mail-outline" size={16} color={colors.text.primary} />
+      <Text style={styles.msgBtnText}>Mesaj</Text>
+    </TouchableOpacity>
+  );
 }
 
 function PostHeader({ post, state, commentCount, onBack, onToggleLike, onToggleRepost }: PostHeaderProps) {
@@ -72,9 +97,10 @@ function PostHeader({ post, state, commentCount, onBack, onToggleLike, onToggleR
             </View>
             <Text style={styles.username}>@{post.author.username}</Text>
           </View>
-          <TouchableOpacity style={styles.followBtn}>
-            <Text style={styles.followBtnText}>Urmărește</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <FollowButton userId={post.author.id} size="small" />
+            <MessageButton authorId={post.author.id} authorUsername={post.author.display_name ?? `@${post.author.username}`} />
+          </View>
         </View>
 
         <Text style={styles.postContent}>{renderContent(post.content)}</Text>
@@ -159,6 +185,17 @@ export default function PostDetailScreen() {
 
   const mockPost = mockPosts.find((p) => p.id === route.params.postId);
   const [displayPost, setDisplayPost] = useState<any>(mockPost ?? route.params.post ?? null);
+  const [loadingPost, setLoadingPost] = useState(!mockPost && !route.params.post);
+
+  // daca postul nu e in mock si nu a fost pasat ca param, il incarcam din backend
+  useEffect(() => {
+    if (mockPost || route.params.post) return;
+    setLoadingPost(true);
+    postService.getPostById(route.params.postId)
+      .then((p) => setDisplayPost(p))
+      .catch(() => {})
+      .finally(() => setLoadingPost(false));
+  }, [route.params.postId]);
 
   const state = displayPost ? (interactions[displayPost.id] ?? {
     liked: displayPost.liked_by_me ?? false,
@@ -217,19 +254,16 @@ export default function PostDetailScreen() {
     });
   };
 
-  if (!displayPost) {
-    return (
-      <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.text.primary} />
-      </SafeAreaView>
-    );
-  }
-
+  // toate hook-urile trebuie apelate inainte de orice early return
   const handleGoBack = useCallback(() => navigation.goBack(), [navigation]);
-  const handleToggleLike = useCallback(() => toggleLike(displayPost.id), [toggleLike, displayPost.id]);
-  const handleToggleRepost = useCallback(() => toggleRepost(displayPost.id), [toggleRepost, displayPost.id]);
+  const handleToggleLike = useCallback(() => {
+    if (displayPost) toggleLike(displayPost.id);
+  }, [toggleLike, displayPost?.id]);
+  const handleToggleRepost = useCallback(() => {
+    if (displayPost) toggleRepost(displayPost.id);
+  }, [toggleRepost, displayPost?.id]);
 
-  const header = useMemo(() => (
+  const header = useMemo(() => displayPost ? (
     <PostHeader
       post={displayPost}
       state={state}
@@ -238,7 +272,16 @@ export default function PostDetailScreen() {
       onToggleLike={handleToggleLike}
       onToggleRepost={handleToggleRepost}
     />
-  ), [displayPost, state, comments.length, handleGoBack, handleToggleLike, handleToggleRepost]);
+  ) : null, [displayPost, state, comments.length, handleGoBack, handleToggleLike, handleToggleRepost]);
+
+  // spinner cat timp se incarca postul sau comentariile
+  if (loadingPost || !displayPost) {
+    return (
+      <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.text.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -379,6 +422,8 @@ const styles = StyleSheet.create({
   badge: { marginLeft: 3 },
   username: { ...typography.bodySmall, color: colors.text.secondary },
   followBtn: { borderWidth: 1.5, borderColor: colors.text.primary, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  msgBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1.5, borderColor: colors.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  msgBtnText: { ...typography.label, fontSize: 13, color: colors.text.primary },
   followBtnText: { ...typography.label, fontSize: 13, color: colors.text.primary },
   postContent: { ...typography.body, fontSize: 20, lineHeight: 28, color: colors.text.primary, marginBottom: 14 },
   mention: { color: colors.accent, fontWeight: '500' },

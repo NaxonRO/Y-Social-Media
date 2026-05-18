@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,106 +6,188 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Avatar } from '../components/PostCard';
-import { trendingHashtags, suggestedUsers } from '../data/mockData';
+import PostCard from '../components/PostCard';
+import FollowButton from '../components/FollowButton';
+import { useAuth } from '../context/AuthContext';
+import { postService } from '../services/postService';
+import { trendingHashtags as mockTrending } from '../data/mockData';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { MainStackParamList, Post } from '../types';
+
+type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 export default function SearchScreen() {
+  const navigation = useNavigation<Nav>();
+  const { user } = useAuth();
+
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
+  const [results, setResults] = useState<Post[]>([]);
+  const [trending, setTrending] = useState<{ tag: string; count: number }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Incarca trending hashtags la pornire
+  useEffect(() => {
+    postService.getTrendingHashtags()
+      .then(setTrending)
+      .catch(() => {
+        // fallback la mock-uri daca backend-ul nu e disponibil
+        setTrending(mockTrending.map(t => ({ tag: t.tag, count: t.posts })));
+      });
+  }, []);
+
+  const doSearch = useCallback(async (q: string) => {
+    const trimmed = q.trim().replace(/^#+/, ''); // eliminam # daca userul l-a pus
+    if (!trimmed) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    setLoading(true);
+    setSearched(true);
+    try {
+      const posts = await postService.searchByHashtag(trimmed);
+      setResults(posts);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Debounce la 600ms
+  const handleQueryChange = (text: string) => {
+    setQuery(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(text), 600);
+  };
+
+  const handleTagPress = (tag: string) => {
+    setQuery(`#${tag}`);
+    setFocused(true);
+    doSearch(tag);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    setResults([]);
+    setSearched(false);
+  };
+
+  const displayTag = query.replace(/^#+/, '') || '';
+
+  const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+      {/* Search bar */}
+      <View style={styles.searchHeader}>
         <View style={[styles.searchBar, focused && styles.searchBarFocused]}>
           <Ionicons name="search" size={18} color={colors.text.secondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Caută pe Y"
+            placeholder="Caută #hashtag"
             placeholderTextColor={colors.input.placeholder}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={handleQueryChange}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            onSubmitEditing={() => doSearch(query)}
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
+            <TouchableOpacity onPress={handleClear}>
               <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
             </TouchableOpacity>
           )}
         </View>
         {focused && (
-          <TouchableOpacity onPress={() => { setQuery(''); setFocused(false); }} style={styles.cancelBtn}>
+          <TouchableOpacity onPress={() => { setFocused(false); handleClear(); }} style={styles.cancelBtn}>
             <Text style={styles.cancelText}>Anulează</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tendințe în România</Text>
-          {trendingHashtags.map((item, index) => (
-            <TouchableOpacity key={item.tag} style={styles.trendItem}>
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.text.primary} />
+        </View>
+      ) : searched && results.length === 0 ? (
+        /* Niciun rezultat */
+        <View style={styles.center}>
+          <Ionicons name="search-outline" size={48} color={colors.text.disabled} />
+          <Text style={styles.emptyTitle}>Niciun rezultat pentru #{displayTag}</Text>
+          <Text style={styles.emptyHint}>Încearcă un alt hashtag</Text>
+        </View>
+      ) : searched ? (
+        /* Rezultate cautare */
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <PostCard
+              post={item}
+              onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
+              currentUserId={user?.id}
+            />
+          )}
+          ListHeaderComponent={
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsTitle}>
+                {results.length} {results.length === 1 ? 'postare' : 'postări'} cu #{displayTag}
+              </Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        /* Trending + sugestii */
+        <FlatList
+          data={trending}
+          keyExtractor={(item) => item.tag}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <Text style={styles.sectionTitle}>Tendințe</Text>
+          }
+          renderItem={({ item, index }) => (
+            <TouchableOpacity style={styles.trendItem} onPress={() => handleTagPress(item.tag)}>
               <View style={styles.trendLeft}>
                 <Text style={styles.trendRank}>{index + 1}</Text>
                 <View>
                   <Text style={styles.trendTag}>#{item.tag}</Text>
-                  <Text style={styles.trendCount}>
-                    {item.posts >= 1000
-                      ? `${(item.posts / 1000).toFixed(1)}k postări`
-                      : `${item.posts} postări`}
-                  </Text>
+                  <Text style={styles.trendCount}>{formatCount(item.count)} postări</Text>
                 </View>
               </View>
-              <TouchableOpacity>
-                <Ionicons name="ellipsis-horizontal" size={18} color={colors.text.secondary} />
-              </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={18} color={colors.text.disabled} />
             </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cine să urmărești</Text>
-          {suggestedUsers.map((u) => (
-            <View key={u.id} style={styles.userItem}>
-              <Avatar username={u.username} size={44} />
-              <View style={styles.userInfo}>
-                <View style={styles.userNameRow}>
-                  <Text style={styles.userDisplay}>{u.display_name ?? u.username}</Text>
-                  {u.is_verified && (
-                    <Ionicons name="checkmark-circle" size={15} color={colors.accent} style={styles.badge} />
-                  )}
-                </View>
-                <Text style={styles.userHandle}>@{u.username}</Text>
-                {u.bio ? (
-                  <Text style={styles.userBio} numberOfLines={1}>{u.bio}</Text>
-                ) : null}
-              </View>
-              <TouchableOpacity style={styles.followBtn}>
-                <Text style={styles.followBtnText}>Urmărește</Text>
-              </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={styles.emptyHint}>Niciun hashtag trending încă.</Text>
+              <Text style={styles.emptyHint}>Postează ceva cu #tag!</Text>
             </View>
-          ))}
-          <TouchableOpacity style={styles.showMore}>
-            <Text style={styles.showMoreText}>Arată mai mult</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
+  safe: { flex: 1, backgroundColor: colors.background },
+  searchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -125,111 +207,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  searchBarFocused: {
-    borderColor: colors.accent,
-    backgroundColor: colors.background,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text.primary,
-  },
-  cancelBtn: {
-    paddingVertical: 4,
-  },
-  cancelText: {
-    ...typography.body,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  section: {
-    borderBottomWidth: 8,
-    borderBottomColor: colors.surface,
-    paddingBottom: 4,
-  },
+  searchBarFocused: { borderColor: colors.accent, backgroundColor: colors.background },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, ...typography.body, color: colors.text.primary },
+  cancelBtn: { paddingVertical: 4 },
+  cancelText: { ...typography.body, color: colors.accent, fontWeight: '600' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
+  emptyTitle: { ...typography.h3, color: colors.text.primary, textAlign: 'center' },
+  emptyHint: { ...typography.body, color: colors.text.secondary, textAlign: 'center' },
   sectionTitle: {
     ...typography.h3,
     color: colors.text.primary,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   trendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  trendLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  trendRank: {
-    ...typography.body,
-    color: colors.text.secondary,
-    width: 16,
-    textAlign: 'center',
-  },
-  trendTag: {
-    ...typography.label,
-    color: colors.text.primary,
-  },
-  trendCount: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  trendLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  trendRank: { ...typography.body, color: colors.text.secondary, width: 20, textAlign: 'center' },
+  trendTag: { ...typography.label, color: colors.text.primary },
+  trendCount: { ...typography.caption, color: colors.text.secondary, marginTop: 2 },
+  resultsHeader: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  userInfo: {
-    flex: 1,
-  },
-  userNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  badge: {},
-  userDisplay: {
-    ...typography.label,
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-  userHandle: {
-    ...typography.bodySmall,
-    color: colors.text.secondary,
-  },
-  userBio: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  followBtn: {
-    backgroundColor: colors.text.primary,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  followBtnText: {
-    ...typography.label,
-    fontSize: 13,
-    color: '#fff',
-  },
-  showMore: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  showMoreText: {
-    ...typography.body,
-    color: colors.accent,
-  },
+  resultsTitle: { ...typography.label, color: colors.text.secondary },
 });

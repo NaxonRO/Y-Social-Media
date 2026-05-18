@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { PostModel } from '../models/Post';
 import { CommentModel } from '../models/Comment';
+import { NotificationModel } from '../models/Notification';
+import { query } from '../config/database';
 import { AuthenticatedRequest } from '../types';
 
 export const postController = {
@@ -45,12 +47,28 @@ export const postController = {
     }
   },
 
+  async getPostById(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const post = await PostModel.findById(id);
+      if (!post) {
+        res.status(404).json({ success: false, message: 'Postarea nu a fost găsită' });
+        return;
+      }
+      res.status(200).json({ success: true, data: { post: PostModel.toPublic(post) } });
+    } catch (error) {
+      console.error('GetPostById error:', error);
+      res.status(500).json({ success: false, message: 'Eroare internă de server' });
+    }
+  },
+
   async getFeed(req: Request, res: Response): Promise<void> {
     try {
       const limit = Math.min(Number(req.query.limit) || 20, 50);
       const cursor = req.query.cursor as string | undefined;
       const userId = (req as AuthenticatedRequest).user?.id;
-      const posts = await PostModel.getFeed(limit, cursor, userId);
+      const followingOnly = req.query.following === 'true';
+      const posts = await PostModel.getFeed(limit, cursor, userId, followingOnly);
       res.status(200).json({
         success: true,
         data: {
@@ -68,6 +86,13 @@ export const postController = {
     try {
       const { id } = req.params;
       const result = await PostModel.toggleLike(id, req.user!.id);
+      // notificare daca a dat like (nu unlike)
+      if (result.liked) {
+        const post = await query(`SELECT user_id FROM posts WHERE id=$1`, [id]);
+        if (post.rows[0]) {
+          NotificationModel.create({ recipient_id: post.rows[0].user_id, actor_id: req.user!.id, type: 'like', post_id: id }).catch(() => {});
+        }
+      }
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       console.error('ToggleLike error:', error);
@@ -79,9 +104,44 @@ export const postController = {
     try {
       const { id } = req.params;
       const result = await PostModel.toggleRepost(id, req.user!.id);
+      if (result.reposted) {
+        const post = await query(`SELECT user_id FROM posts WHERE id=$1`, [id]);
+        if (post.rows[0]) {
+          NotificationModel.create({ recipient_id: post.rows[0].user_id, actor_id: req.user!.id, type: 'repost', post_id: id }).catch(() => {});
+        }
+      }
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       console.error('ToggleRepost error:', error);
+      res.status(500).json({ success: false, message: 'Eroare internă de server' });
+    }
+  },
+
+  async searchPosts(req: Request, res: Response): Promise<void> {
+    try {
+      const q = (req.query.q as string || '').trim();
+      if (!q) {
+        res.status(400).json({ success: false, message: 'Parametrul q este obligatoriu' });
+        return;
+      }
+      const userId = (req as AuthenticatedRequest).user?.id;
+      const posts = await PostModel.searchByHashtag(q, 30, userId);
+      res.status(200).json({
+        success: true,
+        data: { posts: posts.map(PostModel.toPublic), query: q },
+      });
+    } catch (error) {
+      console.error('SearchPosts error:', error);
+      res.status(500).json({ success: false, message: 'Eroare internă de server' });
+    }
+  },
+
+  async getTrendingHashtags(_req: Request, res: Response): Promise<void> {
+    try {
+      const tags = await PostModel.getTrendingHashtags(8);
+      res.status(200).json({ success: true, data: { tags } });
+    } catch (error) {
+      console.error('GetTrending error:', error);
       res.status(500).json({ success: false, message: 'Eroare internă de server' });
     }
   },
@@ -109,6 +169,11 @@ export const postController = {
       if (!comment) {
         res.status(500).json({ success: false, message: 'Eroare la crearea comentariului' });
         return;
+      }
+      // notificare pentru proprietarul postarii
+      const post = await query(`SELECT user_id FROM posts WHERE id=$1`, [postId]);
+      if (post.rows[0]) {
+        NotificationModel.create({ recipient_id: post.rows[0].user_id, actor_id: req.user!.id, type: 'comment', post_id: postId }).catch(() => {});
       }
       res.status(201).json({ success: true, data: { comment: CommentModel.toPublic(comment) } });
     } catch (error) {
